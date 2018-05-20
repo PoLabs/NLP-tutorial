@@ -1,5 +1,28 @@
 setwd('C:/Users/Po/Sync/MDMA NLP/NLP tutorial - kaggle')
 
+# read in the libraries we're going to use
+library(tidyverse) # general utility & workflow functions
+library(tidytext) # tidy implimentation of NLP methods
+library(topicmodels) # for LDA topic modelling 
+library(tm) # general text mining functions
+library(SnowballC) # for stemming
+
+# read in our data
+reviews <- read_csv("deceptive-opinion.csv")
+DTreviews <- read_csv("trumptweets.csv")
+DTreviews <- DTreviews[,c(2:5,13:15)]
+
+
+avfav <- mean(DTreviews$favorite_count)
+avrtw <- mean(DTreviews$retweet_count)
+DTreviews$hi.favorite <- ifelse(DTreviews$favorite_count > (avfav/2),1,0)
+DTreviews$hi.retweet <- ifelse(DTreviews$retweet_count > (avrtw/2),1,0)
+  
+# subsample the dataset (so we can calculate LDA quicker)
+# set.seed(1234) #setting this so we'll always get the same subset
+# row_indexes <- sample(1:nrow(texts), 1600, replace = F) # randomly generate 2000 row indexes
+# texts_subsample <-slice(texts, row_indexes) # get rows at those indexes
+
 #Unsupervised topic modeling with LDA
 #####################################################
 
@@ -50,12 +73,12 @@ top_terms_by_topic_LDA <- function(input_text, # should be a columm from a dataf
 ####determine number of topics
 
 # plot top ten terms in the hotel reviews by topic
-top_terms_by_topic_LDA(reviews$text, number_of_topics = 2)
+top_terms_by_topic_LDA(DTreviews$text, number_of_topics = 2)
 
 
 ######preprocessing text
 # create a document term matrix to clean
-reviewsCorpus <- Corpus(VectorSource(reviews$text)) 
+reviewsCorpus <- Corpus(VectorSource(DTreviews$text)) 
 reviewsDTM <- DocumentTermMatrix(reviewsCorpus)
 
 # convert the document term matrix to a tidytext corpus
@@ -63,12 +86,12 @@ reviewsDTM_tidy <- tidy(reviewsDTM)
 
 # I'm going to add my own custom stop words that I don't think will be
 # very informative in hotel reviews
-custom_stop_words <- tibble(word = c("hotel", "room"))
+#custom_stop_words <- tibble(word = c("hotel", "room"))
 
 # remove stopwords
 reviewsDTM_tidy_cleaned <- reviewsDTM_tidy %>% # take our tidy dtm and...
-  anti_join(stop_words, by = c("term" = "word")) %>% # remove English stopwords and...
-  anti_join(custom_stop_words, by = c("term" = "word")) # remove my custom stopwords
+  anti_join(stop_words, by = c("term" = "word"))#%>% # remove English stopwords and...
+  #anti_join(custom_stop_words, by = c("term" = "word")) # remove my custom stopwords
 
 # reconstruct cleaned documents (so that each word shows up the correct number of times)
 cleaned_documents <- reviewsDTM_tidy_cleaned %>%
@@ -159,34 +182,34 @@ top_terms_by_topic_tfidf <- function(text_df, text_column, group_column, plot = 
 }
 
 # let's see what our most informative deceptive words are
-top_terms_by_topic_tfidf(text_df = reviews, # dataframe
+top_terms_by_topic_tfidf(text_df = DTreviews, # dataframe
                          text_column = text, # column with text
-                         group_column = deceptive, # column with topic label
+                         group_column = hi.favorite, # column with topic label
                          plot = T) # return a plot
 
 # look for the most informative words for postive and negative reveiws
-top_terms_by_topic_tfidf(text_df = reviews, 
+top_terms_by_topic_tfidf(text_df = DTreviews, 
                          text_column = text, 
-                         group = polarity, 
+                         group = hi.retweet, 
                          plot = T)
 
 
 #extra plotting of TF-IDF
 # get just the tf-idf output for the hotel topics
-reviews_tfidf_byHotel <- top_terms_by_topic_tfidf(text_df = reviews, 
-                                                  text_column = text, 
-                                                  group = hotel, 
-                                                  plot = F)
-
-# do our own plotting
-reviews_tfidf_byHotel  %>% 
-  group_by(hotel) %>% 
-  top_n(5) %>% 
-  ungroup %>%
-  ggplot(aes(word, tf_idf, fill = hotel)) +
-  geom_col(show.legend = FALSE) +
-  labs(x = NULL, y = "tf-idf") +
-  facet_wrap(~hotel, ncol = 4, scales = "free", ) +
-  coord_flip()
+# reviews_tfidf_byHotel <- top_terms_by_topic_tfidf(text_df = DTreviews, 
+#                                                   text_column = text, 
+#                                                   group = hi.retweet, 
+#                                                   plot = F)
+# 
+# # do our own plotting
+# reviews_tfidf_byHotel  %>% 
+#   group_by(hotel) %>% 
+#   top_n(5) %>% 
+#   ungroup %>%
+#   ggplot(aes(word, tf_idf, fill = hotel)) +
+#   geom_col(show.legend = FALSE) +
+#   labs(x = NULL, y = "tf-idf") +
+#   facet_wrap(~hotel, ncol = 4, scales = "free", ) +
+#   coord_flip()
 
 
